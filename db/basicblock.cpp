@@ -1780,12 +1780,14 @@ bool BasicBlock::makeUnion(std::list<UnionDefine*>& unionDefine, std::map<char*,
            Exp* prevExp = NULL;
            for (lit = used.begin(); lit != used.end(); lit++){
                Exp *exp =(Exp*) (*lit);
-               //std::cout<<"STATEMENT: "<<statement->prints()<<endl;
-               //std::cout<<"EXP: "<<exp->prints()<<endl;
-//               if (prevExp)
-//                std::cout<<"PREV EXP: "<<prevExp->prints()<<endl;
+               std::cout<<"STATEMENT: "<<statement->prints()<<endl;
+               std::cout<<"EXP: "<<exp->prints()<<endl;
+               if (prevExp)
+                 std::cout<<"PREV EXP: "<<prevExp->prints()<<endl;
                if (exp->isRegOf() && prevExp){
                    char * bitVar = statement->getProc()->getRegName(exp);
+                   if (string(bitVar).find("ACC") == string::npos){
+                       std::cout<<"Bit var: "<<bitVar<<endl;
                    AssignSet reachIn = statement->reachIn;
                    Exp* a = Location::local("a", statement->getProc());
                    Exp* aByte = new Binary(opMemberAccess, Location::regOf(8), new Const("byte"));
@@ -1796,8 +1798,19 @@ bool BasicBlock::makeUnion(std::list<UnionDefine*>& unionDefine, std::map<char*,
                    //std::cout<<"STATEMENT: "<<statement->prints()<<reachIn.prints()<<endl;
                    //std::cout<<"ASSIGN: "<<(assign == NULL)<<endl;
                    if (assign && assign->getAccAssign()){
+                       char * byteVar;
+                       if (!assign->getByteAssign()){
+                           int i = assign->getAccValue();
+                           map<char*, AssemblyArgument*>::iterator it;
+                           for (it = replacement.begin(); it!=replacement.end(); it++){
+                               AssemblyArgument* arg = (*it).second;
+                               if (arg->kind == IMMEDIATE_INT && arg->value.i == i)
+                                   byteVar = (*it).first;
+                           }
+                       } else {
                        //===========================check if this byte var has been in list or not
-                       char * byteVar = assign->getByteAssign();
+                       byteVar = assign->getByteAssign();
+                       }
                        //cout<<"STATEMENT: "<<statement->prints()<<", EXP: "<<exp->prints()<<endl;
                        //std::cout<<"MAKE UNION CALLED"<<endl;
                        bool valid = makeUnion(unionDefine, bitVar, byteVar, bitVar2);
@@ -1834,46 +1847,12 @@ bool BasicBlock::makeUnion(std::list<UnionDefine*>& unionDefine, std::map<char*,
                    Assign* temp2 = new Assign(prevExp, new Const("bits"));
                    statement->replaceRef(prevExp, temp2, convert);
                }
+               }
                if(exp->isRegOf() && string(statement->getProc()->getRegName(exp)).find("bits")!=string::npos)
                 prevExp = exp;
            }
 
         }
-    }
-    list<UnionDefine*>::iterator it2;
-    std::list<Statement*>* stmts = new list<Statement*>();
-    std::cout<<"NUM OF UNION FOUND: "<<unionDefine.size()<<endl;
-    for (it2 = unionDefine.begin(); it2 != unionDefine.end(); it2++){
-       // std::cout<<"LIST OF UNION DEFINE: "<<std::endl;
-        (*it2)->prints();
-        UnionDefine* ud = (*it2);
-        UnionType * ut_temp = new UnionType();
-        ut_temp->addType(new SizeType(8), "byte");
-        CompoundType* ct_temp = new CompoundType();
-        //ud->bitVar->
-        map<int,char*>::iterator mi;
-        for (int i=1; i<9; i++){
-            std::string temp;
-            if (ud->bitVar->find(i) != ud->bitVar->end()){
-                temp = std::string((*ud->bitVar)[i])+":1";
-            } else{
-                temp=string("bit")+std::to_string(i)+string(":1");
-            }
-            //std::cout<<"TEMP: "<<temp<<endl;
-            ct_temp->addType(new SizeType(8), temp.c_str());
-        }
-//        for (mi = ud->bitVar->begin(); mi != ud->bitVar->end(); ++mi)
-//        {
-//            std::string temp(std::string((*mi).second)+":1");
-//            ct_temp->addType(new SizeType(8), temp.c_str());
-//        }
-        ut_temp->addType(ct_temp, "bits");
-        proc->addLocal(ut_temp, ud->byteVar,Location::local(ud->byteVar, proc));
-
-    }
-    list<Statement*>::iterator stit;
-    for(stit = stmts->begin(); stit != stmts->end(); stit++){
-        cout<<(*stit)->prints()<<endl;
     }
     std::cout<<"==================================="<<std::endl;
     return true;
@@ -1952,6 +1931,210 @@ char* BasicBlock::findByteVar(char* bitVar, list<UnionDefine*> unionDefine, User
         }
     }
     return NULL;
+}
+
+void BasicBlock::replaceAcc(std::list<UnionDefine *> &unionDefine, std::map<char *, AssemblyArgument *> replacement, std::map<char *, int> bitVar2){
+    UserProc* proc = NULL;
+    std::list<RTL*>::iterator rit;
+    bool accByteInserted = false;
+    for (rit = m_pRtls->begin(); rit != m_pRtls->end(); rit++){
+        std::list<Statement*>& stmts = (*rit)->getList();
+        std::list<Statement*>::iterator sit;
+        for (sit = stmts.begin(); sit!=stmts.end(); sit++){
+           Statement* statement = (*sit);
+           if (!proc)
+               proc = statement->getProc();
+            LocationSet used;
+           statement->addUsedLocs(used);
+           LocationSet::iterator lit;
+           Exp* prevExp = NULL;
+           for (lit = used.begin(); lit != used.end(); lit++){
+               Exp *exp =(Exp*) (*lit);
+               //std::cout<<"STATEMENT: "<<statement->prints()<<endl;
+               //std::cout<<"EXP: "<<exp->prints()<<endl;
+              //if (prevExp)
+                //std::cout<<"PREV EXP: "<<prevExp->prints()<<endl;
+               if (exp->isRegOf() && prevExp){
+                   char * bitVar = statement->getProc()->getRegName(exp);
+                   if (string(bitVar).find("ACC") != string::npos){
+                   AssignSet reachIn = statement->reachIn;
+                   Exp* a = Location::local("a", statement->getProc());
+                   Exp* aByte = new Binary(opMemberAccess, Location::regOf(8), new Const("byte"));
+                   Assign* assign = reachIn.lookupLoc(a);
+                   if (!assign || !assign->getAccAssign())
+                       assign = reachIn.lookupLoc(aByte);
+                   bool convert;
+                   //std::cout<<"STATEMENT: "<<statement->prints()<<reachIn.prints()<<endl;
+                   //std::cout<<"ASSIGN: "<<(assign == NULL)<<endl;
+                   if (assign && assign->getAccAssign()){
+                       char * byteVar;
+                       if (!assign->getByteAssign()){
+                           int i = assign->getAccValue();
+                           map<char*, AssemblyArgument*>::iterator it;
+                           for (it = replacement.begin(); it!=replacement.end(); it++){
+                               AssemblyArgument* arg = (*it).second;
+                               if (arg->kind == IMMEDIATE_INT && arg->value.i == i)
+                                   byteVar = (*it).first;
+
+                           }
+
+                       } else {
+                       //===========================check if this byte var has been in list or not
+                       byteVar = assign->getByteAssign();
+                       }
+                       bool hasByteVar = false;
+                       string bitVarStr = string(bitVar);
+                       string last =bitVarStr.substr(bitVarStr.length()-1,1);
+                       int num = atoi(last.c_str());
+                       //std::cout<<"LAST: "<<bitVarStr<<last<<num<<endl;
+                       list<UnionDefine*>::iterator uit;
+                       for (uit = unionDefine.begin(); uit!=unionDefine.end(); uit ++){
+                           if (strcmp((*uit)->byteVar, byteVar) == 0 ){
+                               map<int, char*>* map = (*uit)->bitVar;
+                               if (map->find(num) == map->end()){
+                                   (*map)[num] = strdup(string("bit"+std::to_string(num)).c_str());
+                                   bitVar = strdup((string(bitVar).replace(0, 3, "")).c_str());
+                               }
+                               else
+                                    bitVar = (*map->find(num)).second;
+                               hasByteVar = true;
+                           }
+                       }
+                       //std::cout<<"BYTE VAR: "<<byteVar<<"BIT VAR: "<<bitVar<<", HAS BYTE VAR: "<<hasByteVar<<endl;
+                       if (!hasByteVar){
+                           UnionDefine* ud = new UnionDefine();
+                           ud->byteVar = byteVar;
+                           ud->bitVar = new map<int, char*>();
+                           (*ud->bitVar)[num] = strdup(string("bit"+std::to_string(num)).c_str());
+                           bitVar = strdup((string(bitVar).replace(0, 3, "")).c_str());
+                           unionDefine.push_back(ud);
+                       }
+                       //std::cout<<"UD SIZE: "<<unionDefine.size()<<endl;
+                       Assign* temp = new Assign(exp, new Const(bitVar));
+                       //bool convert;
+                       statement->replaceRef(exp, temp, convert);
+                       Assign* temp2 = new Assign(prevExp, new Const("bits"));
+                       statement->replaceRef(prevExp, temp2, convert);
+                       Assign* temp3 = new Assign(Location::regOf(8), Location::local(byteVar, statement->getProc()));
+                       statement->replaceRef(Location::regOf(8), temp3, convert);
+                       //cout<<"STATEMENT: "<<statement->prints()<<", EXP: "<<exp->prints()<<endl;
+                       //std::cout<<"MAKE UNION CALLED"<<endl;
+                   }
+
+               }
+               }
+               if(exp->isRegOf() && string(statement->getProc()->getRegName(exp)).find("bits")!=string::npos)
+                prevExp = exp;
+           }
+
+        }
+    }
+}
+void BasicBlock::removeAccAssignedStatement(std::list<UnionDefine*>& unionDefine, std::map<char*, AssemblyArgument*> replacement){
+    UserProc* proc = NULL;
+    std::list<RTL*>::iterator rit;
+    bool useAccBitAtAll = false;
+    bool useAccBit = false;
+    Assign* assign = NULL;
+    for (rit = m_pRtls->begin(); rit != m_pRtls->end(); rit++){
+        std::list<Statement*>& stmts = (*rit)->getList();
+        std::list<Statement*>::iterator sit;
+        for (sit = stmts.begin(); sit!=stmts.end(); sit++){
+           Statement* statement = (*sit);
+           if (!proc)
+               proc = statement->getProc();
+           if (statement->getAccAssign() && !useAccBit && assign){
+               proc->removeStatement(assign);
+               useAccBit = false;
+               assign = (Assign*) statement;
+           } else {
+            if (statement->getAccAssign()){
+                assign = (Assign*) statement;
+                useAccBit = false;
+             }
+           bool useAccBitInStatement = false;
+           LocationSet used;
+          statement->addUsedLocs(used);
+          LocationSet::iterator lit;
+          Exp* prevExp = NULL;
+          for (lit = used.begin(); lit != used.end(); lit++){
+              Exp *exp =(Exp*) (*lit);
+              //std::cout<<"STATEMENT: "<<statement->prints()<<endl;
+              //std::cout<<"EXP: "<<exp->prints()<<endl;
+             //if (prevExp)
+               //std::cout<<"PREV EXP: "<<prevExp->prints()<<endl;
+              if (exp->isRegOf() && prevExp){
+                  char * bitVar = statement->getProc()->getRegName(exp);
+                  if (string(bitVar).find("ACC") != string::npos){
+                      useAccBit = true;
+                      useAccBitAtAll = true;
+                      useAccBitInStatement = true;
+                      Assign* temp = new Assign(exp, new Const(strdup((string(bitVar).replace(0, 3, "")).c_str())));
+                      bool convert;
+                      statement->replaceRef(exp, temp, convert);
+                      Assign* temp2 = new Assign(prevExp, new Const("bits"));
+                      statement->replaceRef(prevExp, temp2, convert);
+                  }
+
+              }
+
+              if(exp->isRegOf() && string(statement->getProc()->getRegName(exp)).find("bits")!=string::npos)
+               prevExp = exp;
+          }
+          if (!useAccBitInStatement){
+              AssignSet reachIn = statement->reachIn;
+              Exp* a = Location::local("a", statement->getProc());
+              Exp* aByte = new Binary(opMemberAccess, Location::regOf(8), new Const("byte"));
+              Assign* assign = reachIn.lookupLoc(a);
+              if (!assign || !assign->getAccAssign())
+                  assign = reachIn.lookupLoc(aByte);
+              bool convert;
+              //std::cout<<"STATEMENT: "<<statement->prints()<<reachIn.prints()<<endl;
+              //std::cout<<"ASSIGN: "<<(assign == NULL)<<endl;
+              if (assign && assign->getAccAssign()){
+                  char * byteVar;
+                  if (!assign->getByteAssign()){
+                      int i = assign->getAccValue();
+                      map<char*, AssemblyArgument*>::iterator it;
+                      for (it = replacement.begin(); it!=replacement.end(); it++){
+                          AssemblyArgument* arg = (*it).second;
+                          if (arg->kind == IMMEDIATE_INT && arg->value.i == i)
+                              byteVar = (*it).first;
+
+                      }
+
+                  } else {
+                  //===========================check if this byte var has been in list or not
+                  byteVar = assign->getByteAssign();
+                  }
+                  Exp* rhs = Location::local(byteVar, proc);
+//                  Assign* temp3 = new Assign(new Binary(opMemberAccess, Location::regOf(8), new Const("byte")),rhs);
+//                  statement->replaceRef(new Binary(opMemberAccess, Location::regOf(8), new Const("byte")), temp3, convert);
+                  Assign* temp1 = new Assign(Location::regOf(8), rhs);
+                  statement->replaceRef(Location::regOf(8), temp1, convert);
+                  Assign* temp2 = new Assign(Location::local("a", proc), rhs);
+                  statement->replaceRef(Location::local("a", proc), temp2, convert);
+
+              }
+          }
+        }
+      }
+        if (!useAccBit && assign){
+            proc->removeStatement(assign);
+        }
+    }
+    list<UnionDefine*>::iterator uit;
+    bool hasA = false;
+    for (uit = unionDefine.begin(); uit != unionDefine.end(); uit++){
+        if (strcmp((*uit)->byteVar, "a") == 0)
+            hasA = true;
+    }
+    if (useAccBitAtAll && !hasA){
+        UnionDefine* ud = new UnionDefine();
+        ud->byteVar = "a";
+        ud->bitVar = new map<int, char*>();
+        unionDefine.push_back(ud);
+    }
 }
 
 bool BasicBlock::calcReachingDef(){

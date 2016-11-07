@@ -1093,8 +1093,10 @@ ProcSet* UserProc::decompile(ProcList* path, int& indent) {
         std::cout << std::setw(indent) << " " << "decompiling " << getName() << "\n";
 		std::cerr<<"AFTER initialise"<<std::endl;
 		initialiseDecompile();					// Sort the CFG, number statements, etc
-		
+        std::cout<<"1. "<<std::endl;
+        std::cout<<prints();
 		earlyDecompile();
+
 		std::cerr<<"AFTER initialise"<<std::endl;
 		child = middleDecompile(path, indent);
 		// If there is a switch statement, middleDecompile could contribute some cycles. If so, we need to test for
@@ -1148,7 +1150,7 @@ ProcSet* UserProc::decompile(ProcList* path, int& indent) {
 	return child;
 }
 
-bool UserProc::unionCheck() {
+bool UserProc::unionCheck(std::list<UnionDefine*> &unionDefine) {
         //std::cout<<"UNION CHECK OF PROC IS CALLED"<<endl;
         if (VERBOSE)
                 LOG << "begin decompile(" << getName() << ")\n";
@@ -1170,13 +1172,22 @@ bool UserProc::unionCheck() {
                 for (PBB bb = cfg->getFirstBB(it); bb; bb = cfg->getNextBB(it)) {
                     bb->calcReachingDef();
                     //bb->checkUnion(unionDefine);
-                    unionDefine.clear();
 
                    if(!bb->makeUnion(unionDefine, replacement, bitVar))
                        //cout<<"proc check union is false"<<endl;
                        return false;
-                   status = PROC_FINAL;
                 }
+                for (PBB bb = cfg->getFirstBB(it); bb; bb = cfg->getNextBB(it)) {
+                                    bb->replaceAcc(unionDefine, replacement, bitVar);
+                                    //bb->checkUnion(unionDefine);
+                                   //status = PROC_FINAL;
+                                }
+                for (PBB bb = cfg->getFirstBB(it); bb; bb = cfg->getNextBB(it)) {
+                                    bb->removeAccAssignedStatement(unionDefine, replacement);
+                                    //bb->checkUnion(unionDefine);
+                                   status = PROC_FINAL;
+                                }
+
                 return true;
 
 }
@@ -1243,8 +1254,7 @@ void UserProc::earlyDecompile() {
 	if (VERBOSE) LOG << "early decompile for " << getName() << "\n";
 
 	// Update the defines in the calls. Will redo if involved in recursion
-	updateCallDefines();
-
+    updateCallDefines();
 	// First placement of phi functions, renaming, and initial propagation. This is mostly for the stack pointer
 	//maxDepth = findMaxDepth() + 1;
 	//if (Boomerang::get()->maxMemDepth < maxDepth)
@@ -1255,8 +1265,7 @@ void UserProc::earlyDecompile() {
 	if (VERBOSE)
 		LOG << "placing phi functions 1st pass\n";
 	// Place the phi functions
-	df.placePhiFunctions(this);
-
+    df.placePhiFunctions(this);
 	if (VERBOSE)
 		LOG << "numbering phi statements 1st pass\n";
 	numberStatements();				// Number them
@@ -1273,6 +1282,7 @@ void UserProc::earlyDecompile() {
 
 	bool convert;
 	propagateStatements(convert, 1);
+
 	if (VERBOSE) {
 		LOG << "\n--- after propagation (1) for " << getName() << " 1st pass ---\n";
 		printToLog();
@@ -1670,47 +1680,51 @@ void UserProc::remUnusedStmtEtc() {
 		LOG << "--- after remove unused statements etc for " << getName() << "\n";
 		printToLog();
 		LOG << "=== after remove unused statements etc for " << getName() << "\n";
-	}
-
+    }
 	Boomerang::get()->alert_decompile_debug_point(this, "after final");
 }
 void UserProc::checkAccAssign(){
     StatementList::iterator it;
-    StatementList stmts;
-    getStatements(stmts);
-    for (it = stmts.begin(); it!= stmts.end(); it++){
-        Statement* s = (*it);
-        std::cout<<"ISACCASSIGN: "<<s->prints()<<endl;
-        bool isAssignAcc = false;
-        if (s->isAssign()){
-           Assign* assign = (Assign*) s;
-            if (assign->getRight()->isMemOf()&&
-                    assign->getRight()->getSubExp1()->isSubscript() &&
-                    assign->getRight()->getSubExp1()->getSubExp1()->isRegOf()
-                    )
-            {
-                bool isA = false;
-                if (assign->getLeft()->isRegOf()){
-                    isA = ((Const*)assign->getLeft()->getSubExp1())->getInt() == 8;
-                }
-                if (assign->getLeft()->isMemberOf()){
-                    isA = ((Const*)assign->getLeft()->getSubExp1()->getSubExp1())->getInt() == 8;
-                }
+        StatementList stmts;
+        getStatements(stmts);
+        for (it = stmts.begin(); it!= stmts.end(); it++){
+            Statement* s = (*it);
+            bool isAssignAcc = false;
+            if (s->isAssign()){
+               Assign* assign = (Assign*) s;
+                {
+                    bool isA = false;
+                    if (assign->getLeft()->isRegOf()){
 
-                if (isA){
-                 Exp* rhs = (Exp*) assign->getRight()->getSubExp1()->getSubExp1();
-                        char* byteVar = getRegName(rhs);
-                        isAssignAcc = true;
-                        s->setByteAssign(byteVar);
-                        s->setAccAssign(isAssignAcc);
-                        std::cout<<"ISASSIGN: "<<isAssignAcc<<endl;
+                        isA = ((Const*)assign->getLeft()->getSubExp1())->getInt() == 8;
                     }
+                    if (assign->getLeft()->isMemberOf()){
+                        isA = ((Const*)assign->getLeft()->getSubExp1()->getSubExp1())->getInt() == 8;
+                    }
+                    std::cout<<"isA: "<<isA<<endl;
+                    if (isA){
+                        if (assign->getRight()->isMemOf()&&
+                                assign->getRight()->getSubExp1()->isSubscript() &&
+                                assign->getRight()->getSubExp1()->getSubExp1()->isRegOf()
+                                ){
+                     Exp* rhs = (Exp*) assign->getRight()->getSubExp1()->getSubExp1();
+                            char* byteVar = getRegName(rhs);
+                            isAssignAcc = true;
+                            s->setAccAssign(isAssignAcc);
+                            std::cout<<"ISASSIGN: "<<isAssignAcc<<endl;
+                        } else if (assign->getRight()->isMemOf() && assign->getRight()->getSubExp1()->getSubExp1()->isConst()
+                                   && assign->getRight()->getSubExp1()->getSubExp1()->getOper() == opIntConst){
+                            isAssignAcc = true;
+                            std::cout<<"ISASSIGN: "<<isAssignAcc<<endl;
+                            s->setAccValue(((Const*)assign->getRight()->getSubExp1()->getSubExp1())->getInt());
+                        }
+                        }
 
+                }
             }
-        }
-        s->setAccAssign(isAssignAcc);
+            s->setAccAssign(isAssignAcc);
 
-    }
+        }
 }
 
 void UserProc::remUnusedStmtEtc(RefCounter& refCounts) {

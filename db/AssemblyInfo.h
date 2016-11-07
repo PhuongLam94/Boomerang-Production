@@ -4,8 +4,8 @@
 #include <map>
 #include <iostream>	
 using namespace std;
-
-
+typedef unsigned int		ADDRESS;
+class AssemblyProgram;
 enum ARGS_KIND{
 	STRING = 0,
 	DIRECT_INT = 1,
@@ -49,9 +49,12 @@ class UnionDefine{
 public:
         char* byteVar;
         map<int, char*>* bitVar;
+        UnionDefine(){
+            bitVar = new map<int, char*>();
+        }
         void prints(){
             cout << "Byte var: " << byteVar <<endl;
-            cout << "Bit vars: "<<endl;
+            cout << "Bit vars: "<<bitVar->size()<<endl;
             map<int, char*>::iterator mi;
             for (mi = bitVar->begin(); mi != bitVar -> end(); mi++){
                 cout << (*mi).second << ": " << (*mi).first << endl;
@@ -109,7 +112,7 @@ public:
 	INST_KIND kind;
 	int offset;
 	bool checked;
-	std::list<AssemblyExpression*> *expList;
+        std::list<AssemblyExpression*> *expList;
 public:
 	AssemblyLine(){
 		checked = false;

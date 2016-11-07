@@ -40,7 +40,7 @@ FPIC =# -fPIC		# FIXME: is this needed by architectures other than x86?
 # Other variables detected by ./configure
 #
 
-top_srcdir = ..
+top_srcdir = /home/phuong/Boomerang-Production-V3/Boomerang-Production
 
 # HOST_WINDOWS is "yes" if the host OS is Cygwin or MinGW
 HOST_WINDOWS = no

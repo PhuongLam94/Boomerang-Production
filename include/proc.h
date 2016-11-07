@@ -499,7 +499,7 @@ virtual bool		isNoReturn();
 		/// path from the current entry point to the current procedure in the call graph. Pass an empty set at the top
 		/// level.  indent is the indentation level; pass 0 at the top level
 		ProcSet*	decompile(ProcList* path, int& indent);
-                bool            unionCheck();
+                bool            unionCheck(std::list<UnionDefine*> &unionDefine);
 		/// Initialise decompile: sort CFG, number statements, dominator tree, etc.
 		void		initialiseDecompile();
 		/// Prepare for preservation analysis only.

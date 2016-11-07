@@ -68,8 +68,7 @@ std::list<Statement*>* NJMCDecoder::instantiate(ADDRESS pc, const char* name, ..
 	std::pair<std::string,unsigned> sig = RTLDict.getSignature(name);
 	std::string opcode = sig.first;
 	unsigned numOperands = sig.second;
-		
-	// Put the operands into a vector
+    // Put the operands into a vector
 	std::vector<Exp*> actuals(numOperands);
 	va_list args;
 	va_start(args,name);

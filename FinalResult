@@ -1,9 +1,4 @@
-bb
-		MOV
-					 A 
-					 OPTIONS 
+ABCDEFG
 		SETB
-					 TESTUPS1 
-		CLR
 					 A 
 		RET

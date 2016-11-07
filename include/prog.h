@@ -36,6 +36,7 @@ class Statement;
 class StatementSet;
 class Cluster;
 class XMLProgParser;
+class UnionDefine;
 
 typedef std::map<ADDRESS, Proc*, std::less<ADDRESS> > PROGMAP;
 
@@ -301,7 +302,7 @@ protected:
 		DataIntervalMap globalMap;			// Map from address to DataInterval (has size, name, type)
 		int			m_iNumberedProc;		// Next numbered proc will use this
 		Cluster		*m_rootCluster;			// Root of the cluster tree
-
+                std::list<UnionDefine*> unionDefine;
 		friend class XMLProgParser;
 };	// class Prog
 

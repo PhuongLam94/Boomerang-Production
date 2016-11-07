@@ -447,8 +447,43 @@ void address_label(AssemblyProgram* &ass_program){
 	unsigned int last_address = start_address;
 	if (ass_program){
 		for(lbi = ass_program->labelList->begin();lbi != ass_program->labelList->end(); lbi++){
+            AssemblyLabel* label = (*lbi);
 			(*lbi)->address = last_address;
 			last_address = (*lbi)->address + (*lbi)->lineList->size()*4;
+//            if (strcmp((*lbi)->name, "NULL") == 0 ){
+//                ass_program->nullLabelAddress = (*lbi)->address;
+//            }
+//            list<AssemblyLine*>::iterator it;
+//            for (it = label->lineList->begin(); it != label->lineList->end(); it++){
+//                AssemblyLine* line = (*it);
+//                if (strcmp(line->name, "SETB") == 0 || strcmp(line->name, "CLR") ==0){
+//                    AssemblyLine* addedLine = new AssemblyLine();
+//                    addedLine->isAutoAdded = true;
+//                    addedLine->kind = INSTRUCTION;
+//                    addedLine->name="JB";
+//                    addedLine->expList = new list<AssemblyExpression*>();
+//                    AssemblyExpression* exp1 = new AssemblyExpression();
+//                    exp1->kind = UNARY;
+//                    //exp1->argList = new list<AssemblyArgument*>();
+
+//                    exp1->argList.push_back(new AssemblyArgument(line->expList->front()->argList.front()->kind,
+//                                                                 line->expList->front()->argList.front()->value));
+//                    addedLine->expList->push_back(exp1);
+
+//                    AssemblyExpression* exp2 = new AssemblyExpression();
+//                    exp2->kind = UNARY;
+//                    //exp2->argList = new list
+//                    Arg arg2;
+//                    arg2.c = "NULL";
+//                    exp2->argList.push_back(new AssemblyArgument(6, arg2));
+//                    addedLine->expList->push_back(exp2);
+//                    line->addedStatementAddress = last_address;
+//                    label->lineList->push_back(addedLine);
+//                    last_address+=4;
+
+
+//                }
+//            }
 		}
 	}
 }
@@ -473,6 +508,14 @@ AssemblyProgram* AssHandler::process(const char* name) {
 	myfile.close();
 
 	std::cout << "---ADDRESSING LABEL---\n";
+//    AssemblyLabel* nullLabel = new AssemblyLabel();
+//    nullLabel->name="NULL";
+//    AssemblyLine* retLine = new AssemblyLine();
+//    retLine->kind = INSTRUCTION;
+//    retLine->name = "RET";
+//    nullLabel->lineList = new list<AssemblyLine*>();
+//    nullLabel->lineList->push_back(retLine);
+//    ass_program->labelList->push_back(nullLabel);
 	address_label(ass_program);
 
     std::cout << "---HANDLE UNION---\n";

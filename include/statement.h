@@ -151,8 +151,9 @@ protected:
 		Statement	*parent;		// The statement that contains this one
 		RangeMap	ranges;			// overestimation of ranges of locations
 		RangeMap    savedInputRanges;  // saved overestimation of ranges of locations
-                bool        isAccAsign = false; //to know if this is in form of a=m[xxx.byte]
+                bool        isAccAsign = false; //to know if this is in form of a=m[xxx.byte] or a.byte=m[xxx.byte] or a=xxx (xxx is a constant)
                 char*       byteAssign = NULL; //if this is acc assign, this var will store the byte var
+                int         accValue; //if this is acc assign, this var will store the constant value
 		unsigned int lexBegin, lexEnd;
 
 public:
@@ -320,6 +321,8 @@ public:
                 bool getAccAssign(){return isAccAsign;}
                 void setByteAssign(char* a){byteAssign = a;}
                 char* getByteAssign(){return byteAssign;}
+                void setAccValue(int a){accValue = a;}
+                int getAccValue(){return accValue;}
 
 virtual void		rangeAnalysis(std::list<Statement*> &execution_paths);
 

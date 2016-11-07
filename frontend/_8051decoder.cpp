@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <cstring>
 #include <regex>
+#include <string>
 using namespace std;
 
 inline bool isInteger(const std::string & s) {
@@ -138,7 +139,7 @@ unsigned map_sfr(std::string name, std::map<string, int>* symbolTable, int byteV
                 break;
             }
         }
-        if (isDefined || name.find("bits") != string::npos ){
+        if (isDefined || name.find("bits") != string::npos || name.find("ACC") != string::npos ){
         if (symbolTable->find(name) == symbolTable->end()){
             bool existed = false;
             int num;
@@ -268,48 +269,45 @@ extern bool first_line;
 Exp* byte_present(char * reg, std::map<string, int>* symTable){
     Exp* exp = NULL;
     unsigned num = map_sfr(reg, symTable);
-    exp = new Binary(opMemberAccess,Location::regOf(num), new Const("byte"));
-    std::cout<<"BYTE PRESENT: "<<exp->prints()<<endl;
+    //exp = new Binary(opMemberAccess, Location::regOf(num), new Const("byte"));
+    exp = Location::regOf(num);
+    //std::cout<<"BYTE PRESENT: "<<exp->prints()<<endl;
     return exp;
 }
 Exp* access_bit(char * reg, unsigned pos, std::map<string, int>* symTable){
     list<UnionDefine*>::iterator li;
     std::string reg_string(reg);
+    Exp* exp = NULL;
     bool bitVar = pos>8 || pos <1;
         if (bitVar){
-            Exp* exp = NULL;
             unsigned num = 8;
             Exp * exp1 = Location::regOf(num);
             string bits = "bits"+string(reg);
             unsigned num1 = map_sfr(bits.c_str(), symTable, num);
             Exp * exp2 = new Binary(opMemberAccess,exp1, Location::regOf(num1));
             exp = new Binary(opMemberAccess,exp2, Location::regOf(map_sfr(reg, symTable, num, num1)));
-            std::cout<<"ACCESS BIT: "<<exp->prints()<<", "<<bits<<endl;
+            //std::cout<<"ACCESS BIT: "<<exp->prints()<<", "<<bits<<endl;
             //exp = new Binary(opMemberAccess,new Binary(opMemberAccess, Location::regOf(num), new Const("a")), new Const("b"));
             //exp = Location::regOf(num);
             //exp = new Ternary(opAt, Location::regOf(num), new Const(pos), new Const(pos));
-            return exp;
-        }
+            }
 
     if(!bitVar){
         Exp* exp = NULL;
         unsigned num = map_sfr(reg, symTable);
-
-        std::stringstream sstm;
-        sstm << "bit" << pos;
-        std::string name = sstm.str();
-        char *bit =  new char[name.length() + 1];
-        strcpy(bit, name.c_str());
-
+        unsigned num1 = map_sfr(string("ACCbits").c_str(), symTable, num);
+        unsigned num2 = map_sfr(string("ACCbit"+std::to_string(pos)), symTable, num, num1);
         Exp * exp1 = Location::regOf(num);
-        Exp * exp2 = new Binary(opMemberAccess,exp1, new Const("bits"));
-        exp = new Binary(opMemberAccess,exp2, new Const(bit));
+        Exp * exp2 = new Binary(opMemberAccess,exp1, Location::regOf(num1));
+        exp = new Binary(opMemberAccess,exp2, Location::regOf(num2));
 
         //exp = new Binary(opMemberAccess,new Binary(opMemberAccess, Location::regOf(num), new Const("a")), new Const("b"));
         //exp = Location::regOf(num);
         //exp = new Ternary(opAt, Location::regOf(num), new Const(pos), new Const(pos));
-        return exp;
+
     }
+    return exp;
+
 }
 Exp* binary_expr(AssemblyExpression* expr, std::map<string, int>* symTable){
     Exp* exp;
@@ -778,7 +776,7 @@ DecodeResult& _8051Decoder::decodeAssembly(ADDRESS pc,std::string line, Assembly
         std::list<char*>::iterator br;
         for (br = bitReg.begin(); br != bitReg.end(); ++ br ){
             if (strcmp("A",(*br)) == 0){
-                return_s = new Assign(new SizeType(8),(Exp *) Location::regOf(8),new Binary(opMemberAccess,Location::regOf(8), new Const("x")), NULL);
+                return_s = new Assign(new SizeType(8),(Exp *) Location::regOf(8),new Binary(opMemberAccess,Location::regOf(8), new Const("byte")), NULL);
                 result.rtl->appendStmt(return_s);
                 break;
             }
@@ -806,7 +804,8 @@ DecodeResult& _8051Decoder::decodeAssembly(ADDRESS pc,std::string line, Assembly
     else if (opcode == "SETB"){
         ei = Line->expList->begin();
         AssemblyArgument* arg1 = (*ei)->argList.front();
-        stmts = instantiate(pc, "SETB_DIR", access_bit(arg1->value.bit.reg,arg1->value.bit.pos, &symbolTable));
+        stmts=instantiate(pc, "SETB_DIR", access_bit(arg1->value.bit.reg,arg1->value.bit.pos, &symbolTable));
+
     }
     else if (opcode == "ORL" || opcode == "ANL" || opcode == "XRL") {
         stringstream ss;
@@ -919,7 +918,9 @@ DecodeResult& _8051Decoder::decodeAssembly(ADDRESS pc,std::string line, Assembly
     else if (opcode == "CLR") {
         ei = Line->expList->begin();
         AssemblyArgument* arg1 = (*ei)->argList.front();
-        stmts = instantiate(pc, "CLR_DIR", access_bit(arg1->value.bit.reg,arg1->value.bit.pos, &symbolTable));
+        stmts=instantiate(pc, "CLR_DIR", access_bit(arg1->value.bit.reg,arg1->value.bit.pos, &symbolTable));
+
+
     }
     else if (opcode == "NOP") {
     }
@@ -1397,15 +1398,15 @@ DecodeResult& _8051Decoder::decodeAssembly(ADDRESS pc,std::string line, Assembly
         result.rtl = new RTL(pc, stmts);
 
     //ADDED ONE-BYTE REGISTER at the first time
-    if(first_line){
-        std::cout<<"UNION DEFINE SIZE: "<<unionDefine->size()<<std::endl;
-        std::list<Statement*>* temp = initial_bit_regs(&symbolTable);
-        std::list<Statement*>::iterator li;
-        for(li = temp->begin(); li != temp->end(); ++li){
-            result.rtl->appendStmt((*li), true);
-        }
-        first_line = false;
-    }
+//    if(first_line){
+//        std::cout<<"UNION DEFINE SIZE: "<<unionDefine->size()<<std::endl;
+//        std::list<Statement*>* temp = initial_bit_regs(&symbolTable);
+//        std::list<Statement*>::iterator li;
+//        for(li = temp->begin(); li != temp->end(); ++li){
+//            result.rtl->appendStmt((*li), true);
+//        }
+//        first_line = false;
+//    }
     result.unionDefine = *unionDefine;
     return result;
 }

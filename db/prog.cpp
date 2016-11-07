@@ -47,7 +47,8 @@
 #include <vector>
 #include <math.h>
 #ifdef _WIN32
-#include <direct.h>					// For Windows mkdir()
+#include <direct.h>	// For Windows mkdir()
+#include <stdlib.h>
 #endif
 
 #include "type.h"
@@ -69,6 +70,7 @@
 #include "config.h"
 #include "managed.h"
 #include "log.h"
+#include "AssemblyInfo.h"
 
 #ifdef _WIN32
 #undef NO_ADDRESS
@@ -1299,6 +1301,8 @@ void Prog::decompile() {
 		if (VERBOSE)
 			LOG << "decompiling entry point " << (*ee)->getName() << "\n";
 		int indent = 0;
+        std::cout<<"0. "<<std::endl;
+        std::cout<<(*ee)->prints();
 		(*ee)->decompile(new ProcList, indent);
 	}
 
@@ -1366,7 +1370,7 @@ bool Prog::unionCheck(){
             if (VERBOSE)
                     LOG << "decompiling entry point " << (*ee)->getName() << "\n";
             int indent = 0;
-            if(!(*ee)->unionCheck())
+            if(!(*ee)->unionCheck(unionDefine))
                 return false;
 
     }
@@ -1382,11 +1386,41 @@ bool Prog::unionCheck(){
                             if (proc->isLib()) continue;
                             if (proc->isDecompiled()) continue;
                             int indent = 0;
-                            if(!proc->unionCheck())
+                            if(!proc->unionCheck(unionDefine))
                                 return false;
                             foundone = true;
                     }
             }
+    }
+    std::list<UnionDefine*>::iterator it2;
+    std::cout<<"NUM OF UNION FOUND: "<<unionDefine.size()<<endl;
+    for (it2 = unionDefine.begin(); it2 != unionDefine.end(); it2++){
+       //std::cout<<"NUM OF BIT VAR: "<<std::endl;
+        (*it2)->prints();
+        UnionDefine* ud = (*it2);
+        UnionType * ut_temp = new UnionType();
+        ut_temp->addType(new SizeType(8), "byte");
+        CompoundType* ct_temp = new CompoundType();
+        //ud->bitVar->
+        std::map<int,char*>::iterator mi;
+        for (int i=1; i<9; i++){
+            std::string temp;
+            if (ud->bitVar->find(i) != ud->bitVar->end()){
+                temp = std::string((*ud->bitVar)[i])+":1";
+            } else{
+                temp=string("bit")+std::to_string(i)+string(":1");
+            }
+            //std::cout<<"TEMP: "<<temp<<endl;
+            ct_temp->addType(new SizeType(8), temp.c_str());
+        }
+//        for (mi = ud->bitVar->begin(); mi != ud->bitVar->end(); ++mi)
+//        {
+//            std::string temp(std::string((*mi).second)+":1");
+//            ct_temp->addType(new SizeType(8), temp.c_str());
+//        }
+        ut_temp->addType(ct_temp, "bits");
+        Global *temp = new Global(ut_temp, NULL, ud->byteVar);
+        globals.insert(temp);
     }
     return true;
 }

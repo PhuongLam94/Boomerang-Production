@@ -47,7 +47,7 @@
 # Variables detected by ./configure
 #
 
-top_srcdir = .
+top_srcdir = /home/phuong/Boomerang-Production-V3/Boomerang-Production
 
 # HOST_GNU_LD is "yes" if the linker on this host machine is GNU
 HOST_GNU_LD = yes
